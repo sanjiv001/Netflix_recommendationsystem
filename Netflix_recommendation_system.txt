@@ -1,0 +1,146 @@
+import numpy as np
+import pandas as pd
+
+creditlist = pd.read_csv('tmdb_creditlist.csv')
+creditlist.head()
+
+creditlist.info()
+
+creditlist.shape
+
+movieslist = pd.read_csv('tmdb_movieslist.csv')
+movieslist.head()
+
+movieslist.info()
+
+movieslist.shape
+
+# Merging two data sets
+
+creditlist.columns = ['id','title','cast','crew']
+movieslist= movieslist.merge(creditlist,on='id')
+
+movieslist.head()
+
+movieslist.columns
+
+movieslist.shape
+
+Xy= movieslist['vote_average'].mean()
+Xy
+
+# listed out the minimum votes
+ #movies having vote count greater than 90% from the list will be taken
+
+movie= movieslist['vote_count'].quantile(0.9)
+movie
+
+ # fetching the movies listed for sorting
+
+new_movieslist = movieslist.copy().loc[movieslist['vote_count'] >= movie]
+new_movieslist.shape
+
+ # Calculation based on the IMDB rating & formula (movies=1838, Xy=6.09)
+
+def weighted_rating(x, movie=movie, Xy=Xy):
+    v = x['vote_count']
+    R = x['vote_average']
+    return (v/(v+movie) * R) + (movie/(movie+v) * Xy) 
+
+new_movieslist['score'] = new_movieslist.apply(weighted_rating, axis=1)
+
+new_movieslist.head(38)
+
+new_movieslist.shape
+
+#Sorting out the movies based on the score  above calculated formula
+
+new_movieslist = new_movieslist.sort_values('score', ascending=False)
+new_movieslist[['title_x', 'vote_count', 'vote_average', 'score']].head(10)
+
+import matplotlib.pyplot as plt
+
+p= movieslist.sort_values('popularity', ascending=False)
+
+plt.figure(figsize=(12,4))
+
+plt.barh(p['title_x'].head(6),p['popularity'].head(6), align='center',
+        color='m')
+plt.gca().invert_yaxis()
+plt.xlabel("Popularity")
+plt.title("Popular Movies" )
+
+movieslist.columns
+
+p= movieslist.sort_values('budget', ascending=False)
+
+plt.figure(figsize=(12,4))
+
+plt.barh(p['title_x'].head(6),p['budget'].head(6), align='center',
+        color='lightgreen')
+plt.gca().invert_yaxis()
+plt.ylabel("Popularity")
+plt.title("High Budget Movies" )
+
+p= movieslist.sort_values('revenue', ascending=False)
+
+plt.figure(figsize=(12,4))
+
+plt.barh(p['title_x'].head(6),p['revenue'].head(6), align='center',
+        color='lightblue')
+plt.gca().invert_yaxis()
+plt.ylabel("Popularity")
+plt.title("Revenue on Movies" )
+
+new_movieslist.drop(['title_y'], axis=1, inplace=True)
+
+new_movieslist.shape
+
+new_movieslist.head(54)
+
+movieslist['overview'].head(100)
+
+# importing sklearn feature extraction 
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+ 
+tfidf = TfidfVectorizer(stop_words='english')
+
+movieslist['overview'] = movieslist['overview'].fillna('')
+
+
+tfidf_matrix = tfidf.fit_transform(movieslist['overview'])
+
+
+tfidf_matrix.shape
+
+from sklearn.metrics.pairwise import linear_kernel
+
+cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+
+indices = pd.Series(movieslist.index, index=movieslist['title_x']).drop_duplicates()
+
+# Function definitiong for movie recommendation
+
+
+def get_recommendations(title, cosine_sim=cosine_sim):
+   
+    idx = indices[title]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+        
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:11]
+
+   
+    movie_indices = [i[0] for i in sim_scores]
+    return movieslist['title_x'].iloc[movie_indices]
+
+get_recommendations('Avatar')
+
+get_recommendations('The Avengers')
+
+get_recommendations('The Matrix')
+
+get_recommendations('Forrest Gump')
+
